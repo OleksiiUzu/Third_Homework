@@ -104,5 +104,5 @@ def category_sort():
     return
 
 
-if __name__ == '__main':
+if __name__ == '__main__':
     app.run()
