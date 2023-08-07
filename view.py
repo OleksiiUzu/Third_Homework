@@ -170,7 +170,7 @@ def dishes():
         return render_template('all_dishes.html', result=result)
 
 
-def dish(dish_id: int):
+def dish(cat_id: int, dish_id: int):
     """
     methods=['GET', 'POST']
     :return:
