@@ -5,8 +5,10 @@
     <div style="width: 50%; margin: auto">
         {% for dish in result %}
             <div style="padding: 10px; background-color: #EEE; margin: 20px">
-                {% for val in dish %}
-                <p style="font-size: 22px">{{ val }}</p>
+                {% for name, val in dish.items() %}
+                    {% if name != 'ID' %}
+                        <p style="font-size: 22px">{{ name }} : {{ val }}</p>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% endfor %}

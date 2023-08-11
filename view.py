@@ -1,15 +1,51 @@
-from flask import render_template, request
-from db_methods import get_db_data
+from flask import render_template, request, redirect, flash, session
+from db_methods import SQLiteDB
+
+
+# //////////////////////////////////////////////////////////////////////////////
+#  З цим я потім придумаю як краще написати
+
+# get_all може бути True/False (fetchall() / fetchone()) , за замовчуванням повертає fetchall()
+def db_get_data(data_base, tables, *args, params=None, get_all=True):
+    with data_base as db:
+        result = db.select_from(tables, *args, param=params, all_data=get_all)
+    return result
+
+
+def db_post_data(data_base, tables, params=None):
+    with data_base as db:
+        result = db.insert_into(tables, params)
+    return result
+
+
+def db_update_data(data_base, table_name, columns, params):
+    with data_base as db:
+        result = db.update(table_name, columns, params)
+    return result
+
+
+def ordered(data_base, tables, params, asc_desc):
+    with data_base as db:
+        result = db.ordered_by(tables, ['*'], params, asc_desc=asc_desc)
+    return result
+
+# //////////////////////////////////////////////////////////////////////////////
 
 
 def start_page():
     """
     :return: Main Page.
     """
+    if not session.get("Email") and not session.get("Password"):
+        # if not there in the session then redirect to the login page
+        return redirect("user/sign_in")
     return render_template('index.html')
 
 
 def about():
+    """
+    :return: About Page.
+    """
     return render_template('about.html')
 
 
@@ -19,8 +55,9 @@ def cart():
     :return: data of all dishes in cart.
     """
     if request.method == 'GET':
-        result = get_db_data('SELECT * FROM Orders')
-        return render_template('cart.html', result=result)
+        return render_template('cart.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Orders', ['*'])
+                               )
 
 
 def cart_order():
@@ -47,16 +84,27 @@ def user():
     :return: user_data.
     """
     if request.method == 'GET':
-        result = get_db_data("SELECT * FROM User")
-        return render_template('user.html', result=result)
+        return render_template('user.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'User', ['*'], params={'ID': session['ID']})
+                               )
+
+
+def user_update():
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        if db_update_data(SQLiteDB('Dishes.db'), 'User', data, params={'ID': session['ID']}):
+            return redirect('/user')
+    return render_template('user_update.html')
 
 
 def user_register():
-    """
-    methods = [POST]
-    :return:
-    """
-    return '<p> user register </p>'
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        result = db_post_data(SQLiteDB('Dishes.db'), 'User', data)
+        print('result: ', result)
+        if result:
+            return redirect('/user/sign_in')
+    return render_template('register.html')
 
 
 def user_sign_in():
@@ -64,7 +112,21 @@ def user_sign_in():
     methods = [POST]
     :return:
     """
-    return '<p> user sign_in </p>'
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        result = db_get_data(SQLiteDB('Dishes.db'), 'User', ['*'], params=data, get_all=False)
+        if result:
+            flash('You logged in')
+            session['ID'] = result['ID']
+            session['Telephone'] = result['Telephone']
+            session['Email'] = result['Email']
+            session['Password'] = result['Password']
+            session['Tg'] = result['Tg']
+            session['Type'] = result['Type']
+            return redirect('/')
+        else:
+            return '<p>Invalid data</p>'
+    return render_template('sign_in.html')
 
 
 def user_logout():
@@ -72,7 +134,11 @@ def user_logout():
     methods=['POST', 'GET']
     :return:
     """
-    return '<p> user logout </p>'
+    session['ID'] = None
+    session['Email'] = None
+    session['Password'] = None
+    session['Type'] = None
+    return redirect("/")
 
 
 def user_restore():
@@ -80,7 +146,11 @@ def user_restore():
     methods=['POST']
     :return:
     """
-    return '<p> user restore </p>'
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        if db_update_data(SQLiteDB('Dishes.db'), 'User', {'Password': data['Password']}, params={'Email': data['Email']}):
+            return redirect('/user/sign_in')
+    return render_template('password_restore.html')
 
 
 def user_orders_history():
@@ -88,7 +158,12 @@ def user_orders_history():
     methods=['GET']
     :return:
     """
-    return get_db_data('SELECT * FROM Orders')
+    if request.method == 'GET':
+        return render_template('user.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'),
+                                                  'Orders',
+                                                  ['*'],
+                                                  params={'User': session['ID']}))
 
 
 def user_order(order_id: int):
@@ -97,7 +172,10 @@ def user_order(order_id: int):
     methods=['GET']
     :return:
     """
-    return get_db_data(f"SELECT * FROM Orders WHERE ID={order_id}")
+    if request.method == 'GET':
+        return render_template('user.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Orders', ['*'], params={'id': order_id})
+                               )
 
 
 def user_address_list():
@@ -106,28 +184,43 @@ def user_address_list():
     :return:
     """
     if request.method == 'GET':
-        user_data = get_db_data("SELECT ID FROM USER")
-        # user_data[1][0] or user_data[2][0]
-        address_result = get_db_data(f"SELECT * FROM Address WHERE User={user_data[0][0]}")
-        return address_result
+        result = db_get_data(SQLiteDB('Dishes.db'), 'Address', ['*'], params={'User': session['ID']})
+        print(result)
+        return render_template('user_addresses.html', result=result)
+
+
+def user_address_add():
+    result = db_get_data(SQLiteDB('Dishes.db'), 'Address', ['*'], params={'User': session['ID']}, get_all=False)
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        print('this is data: ', data)
+        if db_post_data(SQLiteDB('Dishes.db'), 'Address', params=data):
+            return redirect('/user/addresses')
+        print(result)
+    return render_template('address_add.html', result=result)
 
 
 def user_address(address_id: int):
     """
-    methods=['GET', 'PUT', 'DELETE']
+    methods=['GET', 'POST', 'DELETE']
     :return:
     """
     if request.method == 'GET':
-        user_data = get_db_data("SELECT ID FROM USER")
-        # user_data[1][0] or user_data[2][0]
-        address_result = get_db_data(f"SELECT * FROM Address WHERE User={user_data[0][0]} and ID={address_id}")
-        return address_result
+        data = db_get_data(SQLiteDB('Dishes.db'), 'Address', ['*'], params={'id': address_id})
+        return render_template('user_address_edit.html', result=data)
+    elif request.method == 'POST':
+        data = request.form.to_dict()
+        db_update_data(SQLiteDB('Dishes.db'), 'Address', data,
+                       params={'ID': address_id})
+        return redirect('/user/addresses')
+    return render_template('user_addresses.html')
 
 
 def menu():
     if request.method == 'GET':
-        result = get_db_data("SELECT * FROM Dishes")
-        return render_template('menu.html', result=result)
+        return render_template('menu.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Dishes', ['*'])
+                               )
 
 
 def categories():
@@ -136,8 +229,9 @@ def categories():
     :return:
     """
     if request.method == "GET":
-        result = get_db_data("SELECT * FROM Category")
-        return render_template('categories.html', result=result)
+        return render_template('categories.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Category', ['*'])
+                               )
 
 
 def category_dishes(cat_id):
@@ -146,18 +240,20 @@ def category_dishes(cat_id):
     :return:
     """
     if request.method == "GET":
-        result = get_db_data(f"SELECT * FROM Dishes WHERE Category = {cat_id}")
-        return render_template('category_dishes.html', result=result)
+        return render_template('category_dishes.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Dishes', ['*'], params={'Category': cat_id})
+                               )
 
 
-def category_sort(cat_id, order_by):
+def category_sort(cat_id, order_by, asc_desc_val):
     """
     methods=['GET']
     :return:
     """
     if request.method == "GET":
-        result = get_db_data(f"SELECT * FROM Dishes ORDERED BY {order_by} ASC")
-        return render_template('category_dishes.html', result=result)
+        result = ordered(SQLiteDB('Dishes.db'), 'Dishes', params=order_by, asc_desc=asc_desc_val)
+        print(result)
+        return result
 
 
 def dishes():
@@ -166,18 +262,20 @@ def dishes():
     :return:
     """
     if request.method == 'GET':
-        result = get_db_data("SELECT * FROM Dishes")
-        return render_template('all_dishes.html', result=result)
+        return render_template('category_dishes.html', result=db_get_data(SQLiteDB('Dishes.db'), 'Dishes', ['*'])
+                               )
 
 
 def dish(cat_id: int, dish_id: int):
     """
-    methods=['GET', 'POST']
+    methods=['GET']
     :return:
     """
+    admin_dish_edit(dish_id)
     if request.method == 'GET':
-        result = get_db_data(f"SELECT * FROM Dishes WHERE ID = {dish_id}")
-        return render_template('dish.html', result=result)
+        return render_template('dish.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Dishes', ['*'], params={'ID': dish_id})
+                               )
 
 
 def search():
@@ -188,14 +286,19 @@ def search():
     return
 
 
-def dish_sort(order_by_var, order):
+def dish_sort(order_by_var, asc_desc_val):
     """
     methods=['GET', 'POST']
     :return:
     """
+
     if request.method == 'GET':
-        result = get_db_data("SELECT * FROM Dishes ORDER BY {0} {1}".format(order_by_var, order))
-        return result
+        print('order_by_var: ', order_by_var)
+        return render_template('category_dishes.html',
+                               result=ordered(SQLiteDB('Dishes.db'),
+                                              'Dishes',
+                                              params=order_by_var,
+                                              asc_desc=asc_desc_val))
 
 
 def admin_dishes():
@@ -204,16 +307,41 @@ def admin_dishes():
     :return:
     """
     if request.method == 'GET':
-        return get_db_data("SELECT * FROM Dishes")
+        if session['Type'] == 'Admin':
+            result = db_get_data(SQLiteDB('Dishes.db'), 'Dishes', ['*'])
+            return render_template('category_dishes.html', result=result)
 
 
-def admin_dish(dish_id: int):
+def admin_dish():
     """
-    methods=['GET', 'PUT', 'DELETE']
+    methods=['GET', 'POST']
     :return:
     """
-    if request.method == 'GET':
-        return get_db_data(f"SELECT * FROM Dishes WHERE ID = {dish_id}")
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        if render_template('add_dish.html',
+                           result=db_post_data(SQLiteDB('Dishes.db'), 'Dishes', data)):
+            return redirect('/admin/dishes')
+    return render_template('add_dish.html')
+
+
+def admin_dish_edit(dish_id):
+    """
+    methods=['GET', 'POST']
+    :return:
+    """
+    dish_data = db_get_data(SQLiteDB('Dishes.db'), 'Dishes', ['*'], params={'ID': dish_id})
+    dish_data_dict = dish_data[0]
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        result = render_template('add_dish.html',
+                                 result=db_update_data(SQLiteDB('Dishes.db'),
+                                                       'Dishes',
+                                                       data,
+                                                       params={'ID': dish_data_dict['ID']}))
+        if result:
+            return redirect('/admin/dishes')
+    return render_template('dish_edit.html', result=dish_data_dict)
 
 
 def admin_orders():
@@ -222,7 +350,9 @@ def admin_orders():
     :return:
     """
     if request.method == 'GET':
-        return get_db_data("SELECT * FROM Orders")
+        return render_template('orders.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Orders', ['*'])
+                               )
 
 
 def admin_order(order_id: int):
@@ -230,8 +360,9 @@ def admin_order(order_id: int):
     methods=['GET']
     :return:
     """
-    if request.method == 'GET':
-        return get_db_data(f"SELECT * FROM Orders WHERE ID = {order_id}")
+    return render_template('order.html',
+                           result=db_get_data(SQLiteDB('Dishes.db'), 'Orders', ['*'], params={'id': order_id})
+                           )
 
 
 def admin_sort_order_status():
@@ -255,8 +386,10 @@ def admin_show_categories():
     methods=['GET']
     :return:
     """
-    if request.method == 'GET':
-        return get_db_data('SELECT name FROM Category')
+    if request.method == "GET":
+        return render_template('categories.html',
+                               result=db_get_data(SQLiteDB('Dishes.db'), 'Category', ['*'])
+                               )
 
 
 def admin_category_edit():
@@ -264,7 +397,11 @@ def admin_category_edit():
     methods=['POST', 'DELETE']
     :return:
     """
-    return
+    if request.method == 'POST':
+        data = request.form.to_dict()
+        if db_post_data(SQLiteDB('Dishes.db'), 'Category', data):
+            return redirect('/admin/categories')
+    return render_template('admin_categories.html')
 
 
 def admin_search():

@@ -19,6 +19,7 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav">
+            {% if session['Email'] and session['Type'] == 'User'%}
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('menu') }}">Menu</a>
             </li>
@@ -31,6 +32,29 @@
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('about') }}">About</a>
             </li>
+            {% endif %}
+            {% if session['Email'] and session['Type'] == 'Admin'%}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('admin_dishes') }}">Menu</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('user') }}">Admin Cabinet</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('admin_orders') }}">Admin_Orders</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('about') }}">About</a>
+            </li>
+            {% endif %}
+            {% if not session['Email'] %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('menu') }}">Menu</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('about') }}">About</a>
+            </li>
+            {% endif %}
         </ul>
         </div>
     </div>

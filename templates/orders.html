@@ -5,8 +5,12 @@
     <div style="width: 50%; margin: auto">
         {% for item in result %}
             <div style="padding: 10px; background-color: #EEE; margin: 20px">
+
                 {% for key, value in item.items() %}
-                <p style="font-size: 22px">{{ key }} : {{value}}</p>
+                {% if key == 'ID' %}
+                <a class="nav-link" href="{{ url_for('admin_order', order_id=value)  }}">Order Info</a>
+                <p style="font-size: 22px">ORDER ID : {{value}}</p>
+                {% endif %}
                 {% endfor %}
             </div>
         {% endfor %}
