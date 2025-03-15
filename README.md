@@ -16,8 +16,8 @@ My task was to create a POST requests to the database. Also i needed to add 'ses
 
 1. Clone the repository:  
    ```bash
-   git clone https://github.com/OleksiiUzu/Third_Homework.git
-   cd Third_Homework
+   git clone https://github.com/OleksiiUzu/flask-api-homework-3-post-methods.git
+   cd flask-api-homework-3-post-methods
 2.(Optional) Create and activate a virtual environment:
   python -m venv venv
   source venv/bin/activate
