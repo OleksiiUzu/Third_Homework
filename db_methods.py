@@ -30,7 +30,6 @@ class SQLiteDB:
             return answer.fetchone()
 
     def insert_into(self, table_name, params):
-        # у values перевіряється чи всі символи в значенні є числами, якщо ні то значення буде в лапках
         values = ','.join([str(f"'{i}'") if not all(num.isdigit() for num in i) else str(i) for i in params.values()])
         columns = ','.join([str(i) for i in params.keys()])
         print(values)
@@ -49,7 +48,6 @@ class SQLiteDB:
             return self.sql_query(query, all_data=False)
 
     def update(self, table_name, columns: dict, param: dict):
-        # знаю що DRY, потім щось придумаю))
         columns = ','.join([f"{key}='{value}'" for key, value in columns.items()])
         param = ','.join([f"{key}='{value}'" for key, value in param.items()])
         query = f"UPDATE {table_name} SET {columns} WHERE {param}"
