@@ -3,9 +3,6 @@ from db_methods import SQLiteDB
 
 
 # //////////////////////////////////////////////////////////////////////////////
-#  З цим я потім придумаю як краще написати
-
-# get_all може бути True/False (fetchall() / fetchone()) , за замовчуванням повертає fetchall()
 def db_get_data(data_base, tables, *args, params=None, get_all=True):
     with data_base as db:
         result = db.select_from(tables, *args, param=params, all_data=get_all)
